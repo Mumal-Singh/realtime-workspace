@@ -1,4 +1,4 @@
-import request from 'supertest';
+﻿import request from 'supertest';
 import { createApp } from '../src/app';
 import { prisma } from '../src/lib/prisma';
 import { resetDb } from './setup';
@@ -34,14 +34,14 @@ afterAll(async () => {
 
 describe('task ordering', () => {
   it('assigns increasing positions to new tasks in a list', async () => {
-    const { token, workspaceId, listId } = await setupBoardWithList();
+    const { token, workspaceId, boardId, listId } = await setupBoardWithList();
 
     const t1 = await request(app)
-      .post(`/workspaces/${workspaceId}/boards/x/lists/${listId}/tasks`)
+      .post(`/workspaces/${workspaceId}/boards/${boardId}/lists/${listId}/tasks`)
       .set('Authorization', `Bearer ${token}`)
       .send({ title: 'first' });
     const t2 = await request(app)
-      .post(`/workspaces/${workspaceId}/boards/x/lists/${listId}/tasks`)
+      .post(`/workspaces/${workspaceId}/boards/${boardId}/lists/${listId}/tasks`)
       .set('Authorization', `Bearer ${token}`)
       .send({ title: 'second' });
 
@@ -50,13 +50,13 @@ describe('task ordering', () => {
   });
 
   it('reorders correctly when a task moves to an earlier position in the same list', async () => {
-    const { token, workspaceId, listId } = await setupBoardWithList();
+    const { token, workspaceId, boardId, listId } = await setupBoardWithList();
 
     const titles = ['a', 'b', 'c'];
     const created = [];
     for (const title of titles) {
       const res = await request(app)
-        .post(`/workspaces/${workspaceId}/boards/x/lists/${listId}/tasks`)
+        .post(`/workspaces/${workspaceId}/boards/${boardId}/lists/${listId}/tasks`)
         .set('Authorization', `Bearer ${token}`)
         .send({ title });
       created.push(res.body);
@@ -64,7 +64,7 @@ describe('task ordering', () => {
 
     // move 'c' (position 2) to position 0
     const moveRes = await request(app)
-      .post(`/workspaces/${workspaceId}/boards/x/lists/${listId}/tasks/${created[2].id}/move`)
+      .post(`/workspaces/${workspaceId}/boards/${boardId}/lists/${listId}/tasks/${created[2].id}/move`)
       .set('Authorization', `Bearer ${token}`)
       .send({ listId, position: 0 });
 
@@ -72,7 +72,7 @@ describe('task ordering', () => {
     expect(moveRes.body.position).toBe(0);
 
     const board = await request(app)
-      .get(`/workspaces/${workspaceId}/boards/x`)
+      .get(`/workspaces/${workspaceId}/boards/${boardId}`)
       .set('Authorization', `Bearer ${token}`);
 
     const list = board.body.lists.find((l: any) => l.id === listId);
@@ -112,3 +112,4 @@ describe('task ordering', () => {
     expect(sourceList.tasks[0].position).toBe(0);
   });
 });
+
