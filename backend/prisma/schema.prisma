@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  memberships   WorkspaceMember[]
+  refreshTokens RefreshToken[]
+  assignedTasks Task[]            @relation("TaskAssignee")
+  activityLogs  ActivityLog[]
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Workspace {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  members      WorkspaceMember[]
+  boards       Board[]
+  lists        List[]
+  tasks        Task[]
+  activityLogs ActivityLog[]
+}
+
+model WorkspaceMember {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  role        Role
+  createdAt   DateTime  @default(now())
+
+  // one membership per user per workspace, this is what tenant checks key off of
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+}
+
+model Board {
+  id          String    @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  position    Int
+  createdAt   DateTime  @default(now())
+
+  lists List[]
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId])
+}
+
+model List {
+  id          String    @id @default(uuid())
+  boardId     String
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  board       Board     @relation(fields: [boardId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  name        String
+  position    Int
+  createdAt   DateTime  @default(now())
+
+  tasks Task[]
+
+  @@unique([id, workspaceId])
+  @@index([boardId])
+  @@index([workspaceId])
+}
+
+model Task {
+  id          String     @id @default(uuid())
+  listId      String
+  workspaceId String
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  list        List       @relation(fields: [listId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  title       String
+  description String?
+  position    Int
+  label       String?
+  status      TaskStatus @default(TODO)
+  assigneeId  String?
+  assignee    User?      @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @default(now()) @updatedAt
+
+  @@index([listId])
+  @@index([workspaceId, status])
+  @@index([assigneeId])
+}
+
+model ActivityLog {
+  id          String    @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actorId     String
+  actor       User      @relation(fields: [actorId], references: [id])
+  action      String
+  targetType  String
+  targetId    String
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+
+  @@index([workspaceId, createdAt])
+}
